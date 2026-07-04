@@ -99,9 +99,12 @@ result = molecule_grid(
 
 result.selected_id
 result.selected_ids
+result.event_id
 result.action
 result.errors
 ```
+
+`event_id` changes on every card click, even when the clicked card is already selected. This is useful when Python needs to detect repeated clicks.
 
 ## Detail
 

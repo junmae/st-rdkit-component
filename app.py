@@ -71,7 +71,13 @@ grid = molecule_grid(
 )
 
 cols = st.columns(2)
-cols[0].write({"selected_id": grid.selected_id, "selected_ids": grid.selected_ids})
+cols[0].write(
+    {
+        "selected_id": grid.selected_id,
+        "selected_ids": grid.selected_ids,
+        "event_id": grid.event_id,
+    }
+)
 cols[1].write({"action": grid.action, "errors": grid.errors})
 
 selected = next(

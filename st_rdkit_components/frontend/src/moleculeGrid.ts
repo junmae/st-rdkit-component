@@ -6,6 +6,13 @@ const SVG_CACHE_LIMIT = 500;
 const svgCache = new Map<string, string>();
 let selectedIds = new Set<string>();
 
+function createEventId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function valueOf(record: MoleculeRecord, column: string | null | undefined): string {
   if (!column) {
     return "";
@@ -52,11 +59,15 @@ async function getCachedSvg(
 function emitSelection(
   data: MoleculeGridData,
   api: RenderContext["api"],
-  root: HTMLElement
+  root: HTMLElement,
+  eventId?: string
 ): void {
   const ids = [...selectedIds];
   api.setStateValue("selected_ids", ids);
   api.setStateValue("selected_id", ids[0] ?? null);
+  if (eventId) {
+    api.setStateValue("event_id", eventId);
+  }
 
   const cards = root.querySelectorAll<HTMLElement>("[data-src-card-id]");
   cards.forEach((card) => {
@@ -175,7 +186,7 @@ export async function renderMoleculeGrid({
         } else {
           selectedIds = new Set([id]);
         }
-        emitSelection(data, api, root);
+        emitSelection(data, api, root, createEventId());
       });
       card.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {

@@ -27,6 +27,7 @@ class MolSvgResult:
 class MoleculeGridResult:
     selected_id: str | int | None = None
     selected_ids: list[str | int] = field(default_factory=list)
+    event_id: str | None = None
     action: dict[str, Any] | None = None
     errors: list[dict[str, Any]] = field(default_factory=list)
 
@@ -128,6 +129,7 @@ def _grid_result(raw: Any) -> MoleculeGridResult:
     return MoleculeGridResult(
         selected_id=_get_value(raw, "selected_id", None),
         selected_ids=list(selected_ids),
+        event_id=_get_value(raw, "event_id", None),
         action=_get_value(raw, "action", None),
         errors=list(_get_value(raw, "errors", []) or []),
     )
@@ -185,6 +187,7 @@ def molecule_grid(
     default = {
         "selected_id": None,
         "selected_ids": [],
+        "event_id": None,
         "action": None,
         "errors": [],
     }
