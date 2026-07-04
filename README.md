@@ -1,0 +1,1 @@
+# st-rdkit-component
