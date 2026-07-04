@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "st-rdkit-components"
+version = "0.1.0"
+description = "Streamlit custom component v2 helpers for rendering SMILES with bundled RDKit.js."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "st-rdkit-components contributors" }
+]
+license = { text = "MIT" }
+dependencies = [
+  "streamlit>=1.51"
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: Streamlit",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed"
+]
+
+[project.urls]
+Homepage = "https://github.com/junyanishigaki/st-rdkit-component"
+
+[tool.setuptools]
+packages = ["st_rdkit_components"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+st_rdkit_components = [
+  "pyproject.toml",
+  "frontend/build/**/*"
+]
+
+[tool.streamlit.component]
+components = [
+  { name = "rdkit", asset_dir = "frontend/build" }
+]

@@ -1,0 +1,29 @@
+# OS/editor
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Local environments/secrets
+.venv/
+venv/
+.env
+.env.*
+
+# Build outputs outside packaged component assets
+/dist/
+/build/
+
+# Frontend dependencies and logs
+st_rdkit_components/frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Unused local RDKit CSP experiment assets. The component references
+# RDKit_minimal.js and RDKit_minimal.wasm.
+# st_rdkit_components/frontend/build/RDKIT_minimal_csp.*

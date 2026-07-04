@@ -1,0 +1,4 @@
+[tool.streamlit.component]
+components = [
+  { name = "rdkit", asset_dir = "frontend/build" }
+]

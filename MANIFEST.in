@@ -1,0 +1,3 @@
+include README.md
+include st_rdkit_components/pyproject.toml
+recursive-include st_rdkit_components/frontend/build *

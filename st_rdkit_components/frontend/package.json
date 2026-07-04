@@ -1,0 +1,18 @@
+{
+  "name": "st-rdkit-components-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare-rdkit-assets": "node scripts/copy_rdkit_assets.mjs",
+    "build": "npm run prepare-rdkit-assets && vite build",
+    "csp-check": "node scripts/csp_check.mjs"
+  },
+  "dependencies": {
+    "@rdkit/rdkit": "latest"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
