@@ -1,4 +1,4 @@
-import { smilesToSvg } from "./rdkit";
+import { molInputToSvg } from "./rdkit";
 import type { MolSvgData, RenderContext } from "./types";
 
 export function escapeHtml(value: unknown): string {
@@ -11,25 +11,64 @@ export function escapeHtml(value: unknown): string {
 }
 
 function setShell(root: HTMLElement, data: MolSvgData): void {
-  root.style.minHeight = data.height ? `${data.height}px` : "";
+  root.style.minHeight = "";
+  root.style.height = data.height ? `${data.height}px` : "";
+  root.style.setProperty("--src-mol-height", data.height ? `${data.height}px` : "auto");
+  const shouldShowInput = data.show_input ?? data.show_smiles;
+  const hasHeader = Boolean(data.legend || shouldShowInput);
   root.innerHTML = `
     <section class="src-panel src-mol-svg">
-      <div class="src-mol-header">
-        <div>
-          ${data.legend ? `<div class="src-title">${escapeHtml(data.legend)}</div>` : ""}
-          ${
-            data.show_smiles
-              ? `<div class="src-smiles">${escapeHtml(data.smiles)}</div>`
-              : ""
-          }
-        </div>
-      </div>
+      ${
+        hasHeader
+          ? `<div class="src-mol-header">
+              <div>
+                ${data.legend ? `<div class="src-title">${escapeHtml(data.legend)}</div>` : ""}
+                ${
+                  shouldShowInput
+                    ? `<div class="src-smiles">${escapeHtml(data.mol_input ?? data.smiles)}</div>`
+                    : ""
+                }
+              </div>
+            </div>`
+          : ""
+      }
       <div class="src-mol-body" data-role="mol-body">
-        <div class="src-placeholder">No SMILES provided.</div>
+        <div class="src-placeholder">No molecule input provided.</div>
       </div>
       <div class="src-actions" data-role="mol-actions"></div>
     </section>
   `;
+}
+
+function fitSvgViewBoxToContent(container: HTMLElement): void {
+  const svg = container.querySelector<SVGSVGElement>("svg");
+  if (!svg || typeof svg.getBBox !== "function") {
+    return;
+  }
+
+  try {
+    const box = svg.getBBox();
+    if (!Number.isFinite(box.width) || !Number.isFinite(box.height)) {
+      return;
+    }
+    if (box.width <= 0 || box.height <= 0) {
+      return;
+    }
+
+    const padding = Math.max(box.width, box.height) * 0.05;
+    svg.setAttribute(
+      "viewBox",
+      [
+        box.x - padding,
+        box.y - padding,
+        box.width + padding * 2,
+        box.height + padding * 2
+      ].join(" ")
+    );
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  } catch {
+    // Some browsers can fail getBBox while fonts or SVG nodes are settling.
+  }
 }
 
 export async function renderMolSvg({
@@ -37,7 +76,8 @@ export async function renderMolSvg({
   data,
   api
 }: RenderContext<MolSvgData>): Promise<void> {
-  const smiles = (data.smiles ?? "").trim();
+  const molInput = (data.mol_input ?? data.smiles ?? "").trim();
+  const inputFormat = data.input_format ?? (data.smiles ? "smiles" : "auto");
   setShell(root, data);
 
   const body = root.querySelector<HTMLElement>('[data-role="mol-body"]');
@@ -46,7 +86,7 @@ export async function renderMolSvg({
     return;
   }
 
-  if (!smiles) {
+  if (!molInput) {
     api.setStateValue("status", "idle");
     api.setStateValue("error", null);
     api.setFrameHeight();
@@ -62,11 +102,15 @@ export async function renderMolSvg({
     const fallbackSvgSize = data.height;
     const svgHeight = data.svg_height ?? fallbackSvgSize;
     const svgWidth = data.svg_width ?? svgHeight;
-    const svg = await smilesToSvg(smiles, {
+    const svg = await molInputToSvg(molInput, {
       width: svgWidth,
-      height: svgHeight
+      height: svgHeight,
+      highlightSmarts: data.highlight_smarts,
+      highlightAllMatches: data.highlight_all_matches,
+      highlightDetails: data.highlight_details
     });
     body.innerHTML = `<div class="src-svg-wrap">${svg}</div>`;
+    fitSvgViewBoxToContent(body);
     api.setStateValue("status", "ok");
     api.setStateValue("error", null);
 
@@ -78,7 +122,9 @@ export async function renderMolSvg({
       button.addEventListener("click", () => {
         api.setTriggerValue("action", {
           type: "export_svg",
-          smiles,
+          smiles: inputFormat === "smiles" ? molInput : data.smiles,
+          mol_input: molInput,
+          input_format: inputFormat,
           svg
         });
       });
@@ -89,7 +135,7 @@ export async function renderMolSvg({
       error instanceof Error ? error.message : "Failed to render molecule.";
     body.innerHTML = `
       <div class="src-error">
-        <strong>Invalid SMILES or RDKit.js error</strong>
+        <strong>Invalid molecule input or RDKit.js error</strong>
         <span>${escapeHtml(message)}</span>
       </div>
     `;

@@ -1,67 +1,30 @@
-import type { RDKitModule, RDKitMol } from "./types";
+import type { HighlightDetails, RDKitModule, RDKitMol } from "./types";
+import initRDKitModule from "./generated/RDKIT_minimal_csp_module.js";
+import { rdkitWasmBase64 } from "./generated/rdkitWasmBase64";
 
 let rdkitPromise: Promise<RDKitModule> | null = null;
 
-function loadScript(src: string): Promise<void> {
-  const existing = document.querySelector<HTMLScriptElement>(
-    `script[data-rdkit-src="${src}"]`
-  );
-  if (existing?.dataset.loaded === "true") {
-    return Promise.resolve();
+function base64ToUint8Array(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
   }
-  if (existing) {
-    return new Promise((resolve, reject) => {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), {
-        once: true
-      });
-    });
-  }
-
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.dataset.rdkitSrc = src;
-    script.addEventListener(
-      "load",
-      () => {
-        script.dataset.loaded = "true";
-        resolve();
-      },
-      { once: true }
-    );
-    script.addEventListener(
-      "error",
-      () => reject(new Error(`Failed to load bundled RDKit.js asset: ${src}`)),
-      { once: true }
-    );
-    document.head.appendChild(script);
-  });
+  return bytes;
 }
 
 export function getRDKit(): Promise<RDKitModule> {
   if (!rdkitPromise) {
     rdkitPromise = (async () => {
-      const jsUrl = new URL("./RDKit_minimal.js", import.meta.url).toString();
-      const wasmUrl = new URL("./RDKit_minimal.wasm", import.meta.url).toString();
-
-      await loadScript(jsUrl);
-
-      if (typeof window.initRDKitModule !== "function") {
+      if (typeof initRDKitModule !== "function") {
         throw new Error(
-          "RDKit.js was loaded, but window.initRDKitModule was not found. " +
-            "Check that RDKit_minimal.js matches the expected RDKit.js minimal build."
+          "Bundled RDKit.js did not export initRDKitModule. " +
+            "Check that RDKIT_minimal_csp.js matches the expected RDKit.js minimal CSP build."
         );
       }
 
-      return await window.initRDKitModule({
-        locateFile: (path: string) => {
-          if (path.endsWith(".wasm")) {
-            return wasmUrl;
-          }
-          return path;
-        }
+      return await initRDKitModule({
+        wasmBinary: base64ToUint8Array(rdkitWasmBase64)
       });
     })();
   }
@@ -109,27 +72,116 @@ function sizeSvg(svg: string, width?: number, height?: number): string {
   return new XMLSerializer().serializeToString(svgElement);
 }
 
-export async function smilesToSvg(
-  smiles: string,
-  options: { width?: number | null; height?: number | null } = {}
+function collectNumberValues(value: unknown, target: Set<number>): void {
+  if (!Array.isArray(value)) {
+    return;
+  }
+
+  for (const item of value) {
+    if (Array.isArray(item)) {
+      collectNumberValues(item, target);
+    } else if (typeof item === "number" && Number.isFinite(item)) {
+      target.add(item);
+    }
+  }
+}
+
+function normalizeSubstructMatchDetails(value: unknown): HighlightDetails {
+  const atoms = new Set<number>();
+  const bonds = new Set<number>();
+
+  const addMatch = (match: unknown): void => {
+    if (!match || typeof match !== "object") {
+      return;
+    }
+    const details = match as HighlightDetails;
+    collectNumberValues(details.atoms, atoms);
+    collectNumberValues(details.bonds, bonds);
+  };
+
+  if (Array.isArray(value)) {
+    value.forEach(addMatch);
+  } else {
+    addMatch(value);
+  }
+
+  return {
+    atoms: [...atoms],
+    bonds: [...bonds]
+  };
+}
+
+export async function molInputToSvg(
+  molInput: string,
+  options: {
+    width?: number | null;
+    height?: number | null;
+    highlightSmarts?: string | null;
+    highlightAllMatches?: boolean;
+    highlightDetails?: HighlightDetails | null;
+  } = {}
 ): Promise<string> {
   const rdkit = await getRDKit();
   let mol: RDKitMol | null = null;
+  let qmol: RDKitMol | null = null;
   const width = normalizePositiveInt(options.width);
   const height = normalizePositiveInt(options.height);
   try {
-    mol = rdkit.get_mol(smiles);
+    mol = rdkit.get_mol(molInput);
     if (!mol) {
-      throw new Error(`Invalid SMILES: ${smiles}`);
+      throw new Error("Invalid molecule input.");
     }
-    const svg = width || height ? mol.get_svg(width, height) : mol.get_svg();
+
+    const smarts = (options.highlightSmarts ?? "").trim();
+    const details = { ...(options.highlightDetails ?? {}) };
+    const hasRequestedHighlights = smarts !== "" || Object.keys(details).length > 0;
+
+    if (smarts) {
+      qmol = rdkit.get_qmol(smarts);
+      if (!qmol) {
+        throw new Error(`Invalid SMARTS: ${smarts}`);
+      }
+      const matchDetails = options.highlightAllMatches
+        ? mol.get_substruct_matches(qmol)
+        : mol.get_substruct_match(qmol);
+      Object.assign(details, normalizeSubstructMatchDetails(JSON.parse(matchDetails)));
+    }
+
+    if (hasRequestedHighlights && width) {
+      details.width = width;
+    }
+    if (hasRequestedHighlights && height) {
+      details.height = height;
+    }
+
+    const svg = hasRequestedHighlights
+      ? mol.get_svg_with_highlights(JSON.stringify(details))
+      : width || height
+        ? mol.get_svg(width, height)
+        : mol.get_svg();
     if (!svg) {
-      throw new Error(`RDKit.js returned an empty SVG for SMILES: ${smiles}`);
+      throw new Error("RDKit.js returned an empty SVG for molecule input.");
     }
     return sizeSvg(svg, width, height);
   } finally {
+    if (qmol) {
+      qmol.delete();
+    }
     if (mol) {
       mol.delete();
     }
   }
+}
+
+export async function smilesToSvg(
+  smiles: string,
+  options: {
+    width?: number | null;
+    height?: number | null;
+    highlightSmarts?: string | null;
+    highlightAllMatches?: boolean;
+    highlightDetails?: HighlightDetails | null;
+  } = {}
+): Promise<string> {
+  return molInputToSvg(smiles, options);
 }

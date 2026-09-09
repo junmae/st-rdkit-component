@@ -2,7 +2,7 @@
 
 Streamlit custom component v2 package for rendering SMILES in the browser with bundled RDKit.js. The Python side only passes data; molecule parsing and SVG generation happen in JavaScript.
 
-This package is intended for Streamlit in Snowflake container runtime, where external CDN loading is often unsuitable. `RDKit_minimal.js` and `RDKit_minimal.wasm` are shipped as static component assets.
+This package is intended for Streamlit in Snowflake container runtime, where external CDN loading is often unsuitable. `RDKIT_minimal_csp.js` and `RDKIT_minimal_csp.wasm` are bundled into the component JavaScript at build time.
 
 ## Install
 
@@ -27,13 +27,13 @@ cd ../..
 The frontend build expects these files:
 
 ```text
-st_rdkit_components/frontend/public/RDKit_minimal.js
-st_rdkit_components/frontend/public/RDKit_minimal.wasm
+st_rdkit_components/frontend/public/RDKIT_minimal_csp.js
+st_rdkit_components/frontend/public/RDKIT_minimal_csp.wasm
 ```
 
-After `npm install`, `npm run build` runs `scripts/copy_rdkit_assets.mjs`. It searches likely `@rdkit/rdkit` package paths and copies the two files into `frontend/public/`.
+`npm run build` runs `scripts/copy_rdkit_assets.mjs`, which reads the CSP-safe RDKit.js files from `frontend/public/` and embeds them into the generated `index-*.js` bundle. The Streamlit component does not fetch a separate RDKit JavaScript or wasm file at runtime.
 
-If your `@rdkit/rdkit` package layout differs, place the two files manually in `frontend/public/` and rerun:
+If the files are missing, place them manually in `frontend/public/` and rerun:
 
 ```bash
 cd st_rdkit_components/frontend
@@ -46,10 +46,14 @@ npm run build
 from st_rdkit_components import mol_svg
 
 result = mol_svg(
-    smiles="CC(=O)Oc1ccccc1C(=O)O",
+    mol_input="CC(=O)Oc1ccccc1C(=O)O",
+    input_format="smiles",
     legend="Aspirin",
-    show_smiles=True,
+    show_input=True,
     enable_export=True,
+    highlight_smarts="O=C",
+    highlight_all_matches=True,
+    highlight_details={"highlightColour": [1, 0, 1]},
     svg_width=420,
     svg_height=320,
     height=320,
@@ -61,7 +65,39 @@ result.error
 result.action
 ```
 
+`smiles="CCO"` is still supported as a backward-compatible shortcut for `mol_input="CCO", input_format="smiles"`.
+
 `height` controls the Streamlit component height. For `mol_svg`, it is also used as the default SVG drawing size. Use `svg_width` and `svg_height` when you want explicit molecule drawing dimensions.
+
+`mol_input` is passed to RDKit.js `get_mol(input)`, which accepts SMILES, SMARTS, MolFile, and JSON strings. `input_format` records the intended format in component state and export actions; RDKit.js still performs the parsing.
+
+```python
+mol_svg(
+    mol_input=molfile_text,
+    input_format="molfile",
+    legend="MolFile input",
+    show_input=True,
+)
+```
+
+`highlight_smarts` highlights substructure matches using RDKit.js SMARTS matching. By default it highlights the first match; set `highlight_all_matches=True` to highlight every match. Multiple matches are merged into one atom/bond highlight set. `highlight_details` is passed to RDKit.js `get_svg_with_highlights`, so it can also be used for manual highlights and drawing options:
+
+```python
+mol_svg(
+    smiles="CC(=O)Oc1ccccc1C(=O)O",
+    highlight_smarts="Oc1[c,n]cccc1",
+    highlight_all_matches=True,
+    highlight_details={
+        "highlightColour": [1, 0, 1],
+        "addAtomIndices": True,
+    },
+)
+
+mol_svg(
+    smiles="CC(=O)Oc1ccccc1C(=O)O",
+    highlight_details={"atoms": [0, 1, 10], "bonds": [0]},
+)
+```
 
 `result.action` contains SVG only when the user clicks Export SVG:
 
@@ -140,7 +176,7 @@ npm run build
 npm run csp-check
 ```
 
-`npm run csp-check` scans built JavaScript and bundled `RDKit_minimal.js` for:
+`npm run csp-check` scans built JavaScript for:
 
 - `eval(`
 - `new Function`
@@ -151,11 +187,11 @@ The command prints warnings instead of failing. Snowflake Streamlit container ru
 
 ## Snowflake notes
 
-- RDKit.js and wasm are loaded from component static assets, not an external CDN.
+- RDKit.js and wasm are bundled into the component JavaScript, not loaded from an external CDN.
 - The Python package does not depend on the RDKit Python package.
 - The component renders only visible records. It is not designed for drawing 100,000 molecules at once.
 - SVG strings are not returned to Python during normal rendering. They are returned only through explicit export actions.
-- Invalid SMILES are handled in JavaScript and shown inside the component; error state is also sent back to Python.
+- Invalid molecule inputs are handled in JavaScript and shown inside the component; error state is also sent back to Python.
 - If the RDKit.js build uses `eval`, `new Function`, or `importScripts`, Snowflake CSP may prevent it from running.
 
 ## Demo

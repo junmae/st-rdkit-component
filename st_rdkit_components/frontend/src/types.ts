@@ -1,4 +1,5 @@
 export type ComponentType = "mol_svg" | "molecule_grid" | "molecule_detail";
+export type MolInputFormat = "smiles" | "molfile" | "json" | "smarts" | "auto";
 
 export interface BaseData {
   component_type?: ComponentType;
@@ -8,11 +9,23 @@ export interface BaseData {
 export interface MolSvgData extends BaseData {
   component_type: "mol_svg";
   smiles?: string;
+  mol_input?: string | null;
+  input_format?: MolInputFormat | null;
   legend?: string | null;
   show_smiles?: boolean;
+  show_input?: boolean;
   enable_export?: boolean;
+  highlight_smarts?: string | null;
+  highlight_all_matches?: boolean;
+  highlight_details?: HighlightDetails | null;
   svg_width?: number | null;
   svg_height?: number | null;
+}
+
+export interface HighlightDetails {
+  atoms?: number[];
+  bonds?: number[];
+  [key: string]: unknown;
 }
 
 export interface MoleculeRecord {
@@ -65,11 +78,15 @@ export interface RenderContext<T extends ComponentData = ComponentData> {
 
 export interface RDKitMol {
   get_svg: (width?: number, height?: number) => string;
+  get_svg_with_highlights: (details: string) => string;
+  get_substruct_match: (query: RDKitMol) => string;
+  get_substruct_matches: (query: RDKitMol) => string;
   delete: () => void;
 }
 
 export interface RDKitModule {
-  get_mol: (smiles: string) => RDKitMol | null;
+  get_mol: (input: string) => RDKitMol | null;
+  get_qmol: (smarts: string) => RDKitMol | null;
 }
 
 declare global {

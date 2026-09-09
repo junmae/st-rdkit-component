@@ -46,7 +46,15 @@ button {
   gap: 0.75rem;
 }
 
+.src-mol-svg {
+  height: var(--src-mol-height, auto);
+  min-height: 0;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
 .src-mol-header {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
@@ -78,6 +86,11 @@ button {
   overflow: hidden;
 }
 
+.src-mol-svg .src-mol-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .src-svg-wrap {
   width: 100%;
   max-width: 100%;
@@ -90,6 +103,16 @@ button {
   display: block;
   max-width: 100%;
   height: auto;
+}
+
+.src-mol-svg .src-svg-wrap {
+  height: 100%;
+  padding: 0;
+}
+
+.src-mol-svg .src-svg-wrap svg {
+  width: auto;
+  max-height: 100%;
 }
 
 .src-placeholder,
@@ -117,6 +140,10 @@ button {
   flex-wrap: wrap;
   gap: 0.45rem;
   align-items: center;
+}
+
+.src-actions:empty {
+  display: none;
 }
 
 .src-button {

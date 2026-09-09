@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 from importlib import resources
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Literal, Mapping, Sequence
 
 __all__ = [
+    "MolInputFormat",
     "MolSvgResult",
     "MoleculeDetailResult",
     "MoleculeGridResult",
@@ -37,6 +38,9 @@ class MoleculeDetailResult:
     selected_id: str | int | None = None
     action: dict[str, Any] | None = None
     error: str | None = None
+
+
+MolInputFormat = Literal["smiles", "molfile", "json", "smarts", "auto"]
 
 
 def _noop_callback(*_: Any, **__: Any) -> None:
@@ -145,22 +149,37 @@ def _detail_result(raw: Any) -> MoleculeDetailResult:
 
 def mol_svg(
     *,
-    smiles: str,
+    smiles: str | None = None,
+    mol_input: str | None = None,
+    input_format: MolInputFormat | None = None,
     legend: str | None = None,
     show_smiles: bool = False,
+    show_input: bool | None = None,
     enable_export: bool = False,
+    highlight_smarts: str | None = None,
+    highlight_all_matches: bool = False,
+    highlight_details: Mapping[str, Any] | None = None,
     svg_width: int | None = None,
     svg_height: int | None = None,
     height: int = 320,
     key: str | None = None,
 ) -> MolSvgResult:
     default = {"status": "idle", "error": None, "action": None}
+    resolved_input = mol_input if mol_input is not None else smiles
+    resolved_format = input_format or ("smiles" if smiles is not None else "auto")
+    resolved_show_input = show_smiles if show_input is None else show_input
     data = {
         "component_type": "mol_svg",
         "smiles": smiles,
+        "mol_input": resolved_input,
+        "input_format": resolved_format,
         "legend": legend,
         "show_smiles": show_smiles,
+        "show_input": resolved_show_input,
         "enable_export": enable_export,
+        "highlight_smarts": highlight_smarts,
+        "highlight_all_matches": highlight_all_matches,
+        "highlight_details": dict(highlight_details or {}),
         "svg_width": svg_width,
         "svg_height": svg_height,
         "height": height,

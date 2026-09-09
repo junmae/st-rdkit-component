@@ -2,11 +2,13 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const frontendRoot = resolve(new URL("..", import.meta.url).pathname);
-const targets = [
-  join(frontendRoot, "build"),
-  join(frontendRoot, "build", "RDKit_minimal.js")
+const targets = [join(frontendRoot, "build")];
+const patterns = [
+  { label: "eval(", regex: /\beval\s*\(/ },
+  { label: "new Function", regex: /\bnew\s+Function\b/ },
+  { label: "Function(", regex: /\bFunction\s*\(/ },
+  { label: "importScripts(", regex: /\bimportScripts\s*\(/ }
 ];
-const patterns = ["eval(", "new Function", "Function(", "importScripts("];
 
 function filesUnder(path) {
   if (!existsSync(path)) {
@@ -24,10 +26,10 @@ for (const file of [...new Set(targets.flatMap(filesUnder))]) {
     continue;
   }
   const text = readFileSync(file, "utf8");
-  for (const pattern of patterns) {
-    if (text.includes(pattern)) {
+  for (const { label, regex } of patterns) {
+    if (regex.test(text)) {
       warningCount += 1;
-      console.warn(`[csp-check] warning: ${pattern} found in ${file}`);
+      console.warn(`[csp-check] warning: ${label} found in ${file}`);
     }
   }
 }
